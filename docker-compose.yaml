@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  namenode:
+    image: hadoop
+    container_name: namenode
+    ports:
+      - 9870:9870
+    restart: always
+    command: /scripts/namenode.sh
+    depends_on:
+      - datanode1
+      - datanode2
+      - datanode3
+
+  resourcemanager:
+    image: hadoop
+    container_name: resourcemanager
+    ports:
+      - 8088:8088
+    restart: always
+    command: /scripts/resourcemanager.sh
+    depends_on:
+      - datanode1
+      - datanode2
+      - datanode3
+
+  datanode1:
+    image: hadoop
+    container_name: datanode1
+    ports:
+      - 8040:8042
+      - 9862:9864
+    restart: always
+
+  datanode2:
+    image: hadoop
+    container_name: datanode2
+    ports:
+      - 8041:8042
+      - 9863:9864
+    restart: always
+
+  datanode3:
+    image: hadoop
+    container_name: datanode3
+    ports:
+      - 8042:8042
+      - 9864:9864
+    restart: always
+
+  spark:
+    image: spark
+    container_name: spark
+    ports:
+      - 8081:8080
+      - 18080:18080
+      - 7777:7777
+    restart: always
+
+  consumer:
+    image: consumer-hadoop
+    container_name: consumer-hadoop
+    env_file:
+      - .env
+    restart: always
+    depends_on:
+      - namenode

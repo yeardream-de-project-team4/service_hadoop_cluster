@@ -20,7 +20,6 @@ consumer = KafkaConsumer(
     bootstrap_servers=os.getenv("KAFKA_BROKERS").split(","),
     value_deserializer=lambda x: json.loads(x.decode("utf-8")),
     group_id="consumer-load-hadoop",
-    auto_offset_reset="earliest",
     enable_auto_commit=True,
 )
 consumer.subscribe(["topic-load-hadoop"])

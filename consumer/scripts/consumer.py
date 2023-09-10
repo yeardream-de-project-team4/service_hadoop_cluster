@@ -1,40 +1,44 @@
 import os
 import json
+
 from kafka import KafkaConsumer
 from minio import Minio
 from hdfs import InsecureClient
 
-# MinIO
-minio_client = Minio(
-    os.getenv("MINIO_HOST"),
-    os.getenv("MINIO_USER"),
-    os.getenv("MINIO_PASSWORD"),
-    secure=False,
-)
+from consumer_file import callback_file
 
-# HDFS
-hdfs_client = InsecureClient("http://namenode:9870", user="root")
 
-# Consumer
-consumer = KafkaConsumer(
-    bootstrap_servers=os.getenv("KAFKA_BROKERS").split(","),
-    value_deserializer=lambda x: json.loads(x.decode("utf-8")),
-    group_id="consumer-load-hadoop",
-    enable_auto_commit=True,
-)
-consumer.subscribe(["topic-load-hadoop"])
+class MessageConsumer:
+    def __init__(self):
+        self.consumer = KafkaConsumer(
+            bootstrap_servers=os.getenv("KAFKA_BROKERS").split(","),
+            value_deserializer=lambda x: json.loads(x.decode("utf-8")),
+            group_id=os.getenv("KAFKA_CONSUMER_GROUP"),
+            enable_auto_commit=True,
+        )
+        self.events = {}
+        self.minio = Minio(
+            os.getenv("MINIO_HOST"),
+            os.getenv("MINIO_USER"),
+            os.getenv("MINIO_PASSWORD"),
+            secure=False,
+        )
+        self.hdfs = InsecureClient("http://namenode:9870", user="root")
 
-for message in consumer:
-    try:
-        if "data_from_flask" not in hdfs_client.list("/"):
-            hdfs_client.makedirs("/data_from_flask")
-        data = message.value
-        bucket, filename = data["bucket"], data["filename"]
-        hdfs_path = f"/data_from_flask/{filename}"
-        response = minio_client.get_object(bucket, filename)
+    def regist_event(self, topic, callback):
+        self.events[topic] = callback
 
-        with hdfs_client.write(hdfs_path) as writer:
-            for d in response.stream(32 * 1024):
-                writer.write(d)
-    except Exception:
-        continue
+    def start(self):
+        self.consumer.subscribe(list(self.events.keys()))
+        for message in self.consumer:
+            try:
+                self.events[message.topic](message, self.minio, self.hdfs)
+            except Exception as e:
+                print(e)
+                continue
+
+
+if __name__ == "__main__":
+    consumer = MessageConsumer()
+    consumer.regist_event("flask-hadoop-file", callback_file)
+    consumer.start()

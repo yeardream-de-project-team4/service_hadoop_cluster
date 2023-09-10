@@ -58,7 +58,7 @@ services:
       - 7777:7777
     restart: always
 
-  consumer:
+  consumer-hadoop:
     image: consumer-hadoop
     container_name: consumer-hadoop
     env_file:
